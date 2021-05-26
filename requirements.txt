@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+gunicorn
+uvloop
+httptools
+databases
+asyncpg
+python-dotenv
+geopandas
+psycopg2-binary
