@@ -18,14 +18,9 @@ app.include_router(bikeshare_router)
 
 @app.on_event("startup")
 async def startup():
-    await db.connect()
-
-    # for sql_cmd in startup_commands:
-
-    #     await db.execute(query=sql_cmd)
+    pass
 
 
 @app.on_event("shutdown")
 async def shutdown():
-
-    await db.disconnect()
+    pass
