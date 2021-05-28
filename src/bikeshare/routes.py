@@ -30,7 +30,9 @@ async def get_all_indego_stations() -> dict:
             station_shapes
     """
     return await postgis_query_to_geojson(
-        query, ["station_id", "name", "addressstreet", "geometry"]
+        query,
+        ["station_id", "name", "addressstreet", "geometry"],
+        BIKESHARE_DATABASE_URL,
     )
 
 
