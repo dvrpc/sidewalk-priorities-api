@@ -6,7 +6,8 @@ from src.db import postgis_query_to_geojson, sql_query_to_json
 
 # Load Bikeshare database URI from .env file
 load_dotenv(find_dotenv())
-BIKESHARE_DATABASE_URL = os.environ.get("BIKESHARE_DATABASE_URL")
+# BIKESHARE_DATABASE_URL = os.environ.get("BIKESHARE_DATABASE_URL")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 bikeshare_router = APIRouter(
@@ -32,7 +33,7 @@ async def get_all_indego_stations() -> dict:
     return await postgis_query_to_geojson(
         query,
         ["station_id", "name", "addressstreet", "geometry"],
-        BIKESHARE_DATABASE_URL,
+        DATABASE_URL,
     )
 
 
@@ -59,7 +60,7 @@ async def get_trips_for_single_indego_station_as_geojson(
     return await postgis_query_to_geojson(
         query,
         ["station_id", "origins", "destinations", "totalTrips", "geometry"],
-        BIKESHARE_DATABASE_URL,
+        DATABASE_URL,
     )
 
 
@@ -99,7 +100,7 @@ async def get_spider_diagram_for_single_indego_station_as_geojson(
     return await postgis_query_to_geojson(
         query,
         ["station_id", "origins", "destinations", "totalTrips", "geometry"],
-        BIKESHARE_DATABASE_URL,
+        DATABASE_URL,
     )
 
 
@@ -123,4 +124,4 @@ async def get_timeseries_data_for_single_station(q: int) -> dict:
         order by trip_dir, y, q
     """
 
-    return await sql_query_to_json(query, ["trip_dir", "yq", "total_trips"], BIKESHARE_DATABASE_URL)
+    return await sql_query_to_json(query, ["trip_dir", "yq", "total_trips"], DATABASE_URL)
