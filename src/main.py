@@ -24,3 +24,8 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     pass
+
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the OMAD api. Visit /docs to see all available API routes."}
