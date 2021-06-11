@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .bikeshare.routes import bikeshare_router
+from bikeshare.routes import bikeshare_router
 
 app = FastAPI()
 
