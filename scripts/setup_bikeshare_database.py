@@ -10,7 +10,7 @@ BIKESHARE_DATABASE_URL = os.environ.get("BIKESHARE_DATABASE_URL")
 MATERIALIZED_VIEWS = [
     # TURN RAW TRIP TABLE INTO SIMPLIFIED TABLE
     """
-    create materialized view if not exists 
+    create materialized view if not exists
     trips_simplified
     as
         select

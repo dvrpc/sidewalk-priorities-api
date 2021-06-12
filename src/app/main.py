@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from bikeshare.routes import bikeshare_router
+from .bikeshare.routes_indego import bikeshare_router
 
 app = FastAPI()
 
@@ -28,4 +28,6 @@ async def shutdown():
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the OMAD api. Visit /docs to see all available API routes."}
+    return {
+        "message": "Welcome to the OMAD api. Visit /docs to see all available API routes. Changes were made."
+    }
