@@ -10,9 +10,7 @@ def encode_geometry(geometry):
     Transform `shapely.geometry' into PostGIS type
     """
     if not hasattr(geometry, "__geo_interface__"):
-        raise TypeError(
-            "{g} does not conform to " "the geo interface".format(g=geometry)
-        )
+        raise TypeError("{g} does not conform to " "the geo interface".format(g=geometry))
 
     shape = shapely.geometry.asShape(geometry)
     return shapely.wkb.dumps(shape)
@@ -53,8 +51,9 @@ async def postgis_query_to_geojson(query: str, columns: list, uri: str):
 
 async def sql_query_to_json(query: str, columns: list, uri: str):
     """
-    Connect to postgres via `asyncpg` and return spatial query output
-    as a geojson file
+    Connect to postgres via `asyncpg`
+
+    TODO: refactor business logic out of this function
     """
     conn = await asyncpg.connect(uri)
 
@@ -77,3 +76,18 @@ async def sql_query_to_json(query: str, columns: list, uri: str):
         output[val]["data_values"] = list(filtered["total_trips"])
 
     return output
+
+
+async def sql_query_to_df(query: str, columns: list, uri: str) -> pandas.DataFrame:
+    """
+    Connect to postgres via `asyncpg` and return a NON-spatial dataframe
+    """
+    conn = await asyncpg.connect(uri)
+
+    try:
+        result = await conn.fetch(query)
+
+    finally:
+        await conn.close()
+
+    return pandas.DataFrame.from_records(result, columns=columns)
