@@ -34,6 +34,7 @@ async def get_missing_links_near_poi(
         )
         select
             ml.uid,
+            ml.island_count,
             st_transform(ml.geom, 4326) as geometry
         from api.missing_links ml, bounds b
         where st_intersects(ml.geom, b.geom)
@@ -41,7 +42,7 @@ async def get_missing_links_near_poi(
 
     return await postgis_query_to_geojson(
         query,
-        ["uid", "geometry"],
+        ["uid", "island_count", "geometry"],
         DATABASE_URL,
     )
 
