@@ -8,7 +8,7 @@ from ..database.db import postgis_query_to_geojson, sql_query_to_json
 
 # Load Bikeshare database URI from .env file
 load_dotenv(find_dotenv())
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.environ.get("BIKESHARE_DATABASE_URL")
 
 
 bikeshare_router = APIRouter(
@@ -125,6 +125,4 @@ async def get_timeseries_data_for_single_station(q: int) -> dict:
         order by trip_dir, y, q
     """
 
-    return await sql_query_to_json(
-        query, ["trip_dir", "yq", "total_trips"], DATABASE_URL
-    )
+    return await sql_query_to_json(query, ["trip_dir", "yq", "total_trips"], DATABASE_URL)
