@@ -3,9 +3,13 @@ import asyncio
 import asyncpg
 from dotenv import find_dotenv, load_dotenv
 
+from .helpers import copy_local_tables_to_cloud
+
 load_dotenv(find_dotenv())
 BIKESHARE_DATABASE_URL = os.environ.get("BIKESHARE_DATABASE_URL")
+LOCAL_BIKESHARE_DATABASE_URL = os.environ.get("LOCAL_BIKESHARE_DATABASE_URL")
 
+TABLES_TO_COPY = ["station_shapes", "trips"]
 
 MATERIALIZED_VIEWS = [
     # TURN RAW TRIP TABLE INTO SIMPLIFIED TABLE
@@ -66,6 +70,15 @@ QUERY_TEMPLATE = """
 
 
 async def main():
+    """
+    - Copy data from local database to cloud
+    - Execute a series of queries that generate materialized views for each station
+    """
+
+    # Copy data to cloud database
+    copy_local_tables_to_cloud(TABLES_TO_COPY, LOCAL_BIKESHARE_DATABASE_URL, BIKESHARE_DATABASE_URL)
+
+    # Pre-crunch the necessary data views for each station a user would click on
 
     conn = await asyncpg.connect(BIKESHARE_DATABASE_URL)
 
