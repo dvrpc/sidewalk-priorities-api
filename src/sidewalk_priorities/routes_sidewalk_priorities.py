@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter
 from dotenv import find_dotenv, load_dotenv
 
-from ..database.db import postgis_query_to_geojson, sql_query_to_df
+from ..database.db import postgis_query_to_geojson, sql_query_raw, sql_query_to_df
 
 # Load database URI from .env file
 load_dotenv(find_dotenv())
@@ -47,6 +47,123 @@ async def get_missing_links_near_poi(
     )
 
 
+@sidewalk_router.get("/gaps-within-muni/")
+async def get_missing_links_inside_muni(
+    q: str,
+) -> dict:
+    """
+    Get missing gaps within a municipality
+    """
+
+    if ";" in q:
+        return None
+
+    query = f"""
+        with bounds as (
+            select geom
+            from api.montco_munis
+            where mun_name = '{q}'
+        )
+        select
+            ml.uid,
+            ml.island_count,
+            st_transform(ml.geom, 4326) as geometry
+        from api.missing_links ml, bounds b
+        where st_intersects(ml.geom, b.geom)
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["uid", "island_count", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@sidewalk_router.get("/all-munis/")
+async def get_all_munis() -> dict:
+    """
+    Return a geojson with all municipalities in Montgomery County
+    """
+
+    query = """
+        select
+            mun_name,
+            st_transform(geom, 4326) as geometry
+        from
+            api.montco_munis
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["mun_name", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@sidewalk_router.get("/one-muni/")
+async def get_one_muni(
+    q: str,
+) -> dict:
+    """
+    Accept a string for municpality name
+
+    Return a geojson with one shape
+    """
+
+    if ";" in q:
+        return None
+
+    query = f"""
+        select
+            mun_name,
+            st_transform(geom, 4326) as geometry
+        from
+            api.montco_munis
+        where
+            mun_name = '{q}'
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["mun_name", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@sidewalk_router.get("/one-muni-centroid/")
+async def get_one_muni_centroid(
+    q: str,
+) -> dict:
+    """
+    Accept a string for municpality name
+
+    Return json with X/Y value for the centroid
+    """
+
+    if ";" in q:
+        return None
+
+    query = f"""
+		with point as (
+	        select
+                st_centroid(st_transform(geom, 4326)) as geom
+            from
+                api.montco_munis
+            where
+                mun_name = '{q}'	
+		)
+		select
+            st_x(geom) as x,
+            st_y(geom) as y
+		from point
+    """
+
+    return await sql_query_raw(
+        query,
+        DATABASE_URL,
+    )
+
+
 @sidewalk_router.get("/walkshed-area/")
 async def get_walkshed_areas_for_poi(
     q: int,
@@ -80,3 +197,41 @@ async def get_walkshed_areas_for_poi(
             output[expected_key] = {"area_in_square_miles": [0]}
 
     return output
+
+
+@sidewalk_router.get("/pois-near-gap/")
+async def get_poi_uids_near_gap_segment(
+    q: int,
+) -> dict:
+    """Get a list of unique IDs of POIs that a sidewalk gap would help with"""
+    query = f"""
+    with sw as (
+        select
+            geom
+        from
+            api.missing_links
+        where
+            uid = {int(q)}
+    ),
+    poi_uids as (
+        select distinct i.eta_uid as poi_uid from api.isochrones i, sw
+        where st_intersects(i.geom, sw.geom)
+        and src_network = 'osm_edges_all_no_motorway'
+    )
+    select
+        array_agg(p.poi_name) as poi_name,
+        p.category,
+        p.ab_ratio,
+        st_transform(p.geom, 4326) as geometry
+    from api.pois p
+    inner join
+        poi_uids u
+      on p.poi_uid::text = u.poi_uid
+    group by p.category, p.geom, p.ab_ratio
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["poi_name", "category", "ab_ratio", "geometry"],
+        DATABASE_URL,
+    )
