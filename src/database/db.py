@@ -91,3 +91,18 @@ async def sql_query_to_df(query: str, columns: list, uri: str) -> pandas.DataFra
         await conn.close()
 
     return pandas.DataFrame.from_records(result, columns=columns)
+
+
+async def sql_query_raw(query: str, uri: str):
+    """
+    Connect to postgres via `asyncpg` and return raw result of query
+    """
+    conn = await asyncpg.connect(uri)
+
+    try:
+        result = await conn.fetch(query)
+
+    finally:
+        await conn.close()
+
+    return result
