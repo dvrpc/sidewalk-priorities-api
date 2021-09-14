@@ -50,9 +50,9 @@ async def get_missing_links_near_poi(
 @sidewalk_router.get("/gaps-within-muni/")
 async def get_missing_links_inside_muni(
     q: str,
-) -> dict:
+) -> list:
     """
-    Get missing gaps within a municipality
+    Get missing gap IDs within a municipality
     """
 
     if ";" in q:
@@ -65,18 +65,52 @@ async def get_missing_links_inside_muni(
             where mun_name = '{q}'
         )
         select
-            ml.uid,
-            ml.island_count,
-            st_transform(ml.geom, 4326) as geometry
+            ml.uid
         from api.missing_links ml, bounds b
         where st_intersects(ml.geom, b.geom)
     """
 
-    return await postgis_query_to_geojson(
+    print(query)
+
+    data = await sql_query_raw(
         query,
-        ["uid", "island_count", "geometry"],
         DATABASE_URL,
     )
+
+    return [v for d in data for _, v in d.items()]
+
+
+@sidewalk_router.get("/gaps-near-xy/")
+async def get_missing_links_near_xy(
+    lng: float,
+    lat: float,
+) -> list:
+    """
+    Get missing gaps within 2 miles of lat/lng
+    """
+
+    query = f"""
+        with bounds as (
+            select
+                st_transform(
+                    st_setsrid(
+                        st_point({lng}, {lat}),
+                        4326
+                    ),
+                    26918
+                ) as geom
+        )
+        select
+            ml.uid
+        from api.missing_links ml, bounds b
+        where st_dwithin(ml.geom, b.geom, 3218)
+    """
+
+    data = await sql_query_raw(
+        query,
+        DATABASE_URL,
+    )
+    return [v for d in data for _, v in d.items()]
 
 
 @sidewalk_router.get("/all-munis/")
