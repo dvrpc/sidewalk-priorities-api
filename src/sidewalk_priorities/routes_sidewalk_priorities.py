@@ -18,11 +18,11 @@ sidewalk_router = APIRouter(
 @sidewalk_router.get("/nearby-gaps/")
 async def get_missing_links_near_poi(
     q: int,
-) -> dict:
+) -> list:
     """
     Accept a ID for a point from the ETA dataset
 
-    Return a geojson all missing links that intersect the OSM
+    Return a list of all missing link IDs that intersect the OSM
     """
 
     query = f"""
@@ -33,18 +33,17 @@ async def get_missing_links_near_poi(
             and src_network = 'osm_edges_all_no_motorway'
         )
         select
-            ml.uid,
-            ml.island_count,
-            st_transform(ml.geom, 4326) as geometry
+            ml.uid
         from api.missing_links ml, bounds b
         where st_intersects(ml.geom, b.geom)
     """
 
-    return await postgis_query_to_geojson(
+    data = await sql_query_raw(
         query,
-        ["uid", "island_count", "geometry"],
         DATABASE_URL,
     )
+
+    return [v for d in data for _, v in d.items()]
 
 
 @sidewalk_router.get("/gaps-within-muni/")
@@ -69,8 +68,6 @@ async def get_missing_links_inside_muni(
         from api.missing_links ml, bounds b
         where st_intersects(ml.geom, b.geom)
     """
-
-    print(query)
 
     data = await sql_query_raw(
         query,
@@ -249,7 +246,7 @@ async def get_poi_uids_near_gap_segment(
     ),
     poi_uids as (
         select distinct i.eta_uid as poi_uid from api.isochrones i, sw
-        where st_intersects(i.geom, sw.geom)
+        where st_within(sw.geom, i.geom)
         and src_network = 'osm_edges_all_no_motorway'
     )
     select
