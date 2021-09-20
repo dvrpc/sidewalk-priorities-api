@@ -266,3 +266,41 @@ async def get_poi_uids_near_gap_segment(
         ["poi_name", "category", "ab_ratio", "geometry"],
         DATABASE_URL,
     )
+
+
+@sidewalk_router.get("/pois-near-existing-sidewalk/")
+async def get_poi_uids_near_existing_sidewalk(lng: float, lat: float) -> dict:
+    """Get a geojson of all POIs that have OSM walksheds intersecting a given lng/lat"""
+    query = f"""
+    with sw as (
+        select
+            st_transform(
+                st_setsrid(
+                    st_point({lng}, {lat}),
+                    4326
+                ),
+                26918
+            ) as geom
+    ),
+    poi_uids as (
+        select distinct i.eta_uid as poi_uid from api.isochrones i, sw
+        where st_within(sw.geom, i.geom)
+        and src_network = 'osm_edges_all_no_motorway'
+    )
+    select
+        array_agg(p.poi_name) as poi_name,
+        p.category,
+        p.ab_ratio,
+        st_transform(p.geom, 4326) as geometry
+    from api.pois p
+    inner join
+        poi_uids u
+      on p.poi_uid::text = u.poi_uid
+    group by p.category, p.geom, p.ab_ratio
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["poi_name", "category", "ab_ratio", "geometry"],
+        DATABASE_URL,
+    )
