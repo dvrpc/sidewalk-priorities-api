@@ -49,35 +49,6 @@ async def postgis_query_to_geojson(query: str, columns: list, uri: str):
     return json.loads(gdf.to_json())
 
 
-async def sql_query_to_json(query: str, columns: list, uri: str):
-    """
-    Connect to postgres via `asyncpg`
-
-    TODO: refactor business logic out of this function
-    """
-    conn = await asyncpg.connect(uri)
-
-    try:
-        result = await conn.fetch(query)
-
-    finally:
-        await conn.close()
-
-    df = pandas.DataFrame.from_records(result, columns=columns)
-
-    output = {}
-
-    for val in df["trip_dir"].unique():
-        output[val] = {}
-
-        filtered = df[df["trip_dir"] == val]
-
-        output[val]["labels"] = list(str(x).replace(".", " Q") for x in filtered["yq"])
-        output[val]["data_values"] = list(filtered["total_trips"])
-
-    return output
-
-
 async def sql_query_to_df(query: str, columns: list, uri: str) -> pandas.DataFrame:
     """
     Connect to postgres via `asyncpg` and return a NON-spatial dataframe

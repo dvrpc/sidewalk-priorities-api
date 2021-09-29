@@ -1,5 +1,5 @@
-import os
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from ..database.db import postgis_query_to_geojson, sql_query_raw, sql_query_to_df
 from ..config import DATABASE_URL, URL_ROOT
@@ -75,39 +75,6 @@ async def get_missing_links_inside_muni(
     )
 
 
-@sidewalk_router.get("/gaps-near-xy/")
-async def get_missing_links_near_xy(
-    lng: float,
-    lat: float,
-) -> list:
-    """
-    Get missing gaps within 2 miles of lat/lng
-    """
-
-    query = f"""
-        with bounds as (
-            select
-                st_transform(
-                    st_setsrid(
-                        st_point({lng}, {lat}),
-                        4326
-                    ),
-                    26918
-                ) as geom
-        )
-        select
-            ml.uid
-        from api.missing_links ml, bounds b
-        where st_dwithin(ml.geom, b.geom, 3218)
-    """
-
-    data = await sql_query_raw(
-        query,
-        DATABASE_URL,
-    )
-    return [v for d in data for _, v in d.items()]
-
-
 @sidewalk_router.get("/all-munis/")
 async def get_all_munis() -> dict:
     """
@@ -140,7 +107,7 @@ async def get_one_muni(
     """
 
     if ";" in q:
-        return None
+        return JSONResponse(status_code=404, content={"message": "Given geoid not found."})
 
     query = f"""
         select
