@@ -1,16 +1,12 @@
 import os
 from fastapi import APIRouter
-from dotenv import find_dotenv, load_dotenv
 
 from ..database.db import postgis_query_to_geojson, sql_query_raw, sql_query_to_df
-
-# Load database URI from .env file
-load_dotenv(find_dotenv())
-DATABASE_URL = os.environ.get("DATABASE_URL")
+from ..config import DATABASE_URL, URL_ROOT
 
 
 sidewalk_router = APIRouter(
-    prefix="/sidewalk",
+    prefix=f"{URL_ROOT}/sidewalk",
     tags=["sidewalk priorities"],
 )
 
