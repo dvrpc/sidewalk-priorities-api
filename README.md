@@ -24,10 +24,11 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Create a `.env` file that defines a `DATABASE_URL` or declare it as a system variable
+Create a `.env` file that defines a `DATABASE_URL` and `URL_ROOT` as shown below, or otherwise declare them as a system variables.
 
 ```
 DATABASE_URL = postgresql://username:password@host:port/database
+URL_ROOT = /api/mcosp/v1
 ```
 
 ## Run the API
