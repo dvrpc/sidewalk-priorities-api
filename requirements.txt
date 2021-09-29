@@ -3,7 +3,6 @@ uvicorn
 gunicorn
 uvloop
 httptools
-databases
 asyncpg
 python-dotenv
 geopandas
