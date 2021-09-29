@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .bikeshare.routes_indego import bikeshare_router
 from .sidewalk_priorities.routes_sidewalk_priorities import sidewalk_router
 
 app = FastAPI()
@@ -14,7 +13,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(bikeshare_router)
 app.include_router(sidewalk_router)
 
 

@@ -1,8 +1,8 @@
-# OMAD-api
+# sidewalk-priorities-api
 
-API backend for the Office of Mobility Analysis &amp; Design's experiments and prototypes
+API backend for the Sidewalk Priorities webmap.
 
-## Development Environment
+## Development Environment Setup
 
 Create the virtual environment:
 
@@ -22,11 +22,15 @@ Install requirements:
 pip install -r requirements.txt
 ```
 
-Create a `.env` file that defines a `BIKESHARE_DATABASE_URL`. For example:
+## Configuration
+
+Create a `.env` file that defines a `DATABASE_URL` or declare it as a system variable
 
 ```
-BIKESHARE_DATABASE_URL = postgresql://username:password@host:port/database
+DATABASE_URL = postgresql://username:password@host:port/database
 ```
+
+## Run the API
 
 Run the API locally:
 

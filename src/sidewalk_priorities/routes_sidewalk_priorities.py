@@ -6,7 +6,7 @@ from ..database.db import postgis_query_to_geojson, sql_query_raw, sql_query_to_
 
 # Load database URI from .env file
 load_dotenv(find_dotenv())
-DATABASE_URL = os.environ.get("SUPERUSER_SIDEWALK_PRIORITIES_DATABASE_URL")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 sidewalk_router = APIRouter(
