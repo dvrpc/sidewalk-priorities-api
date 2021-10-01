@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from .sidewalk_priorities.routes_sidewalk_priorities import sidewalk_router
-from .config import URL_ROOT
+from .config import DATABASE_URL, URL_ROOT
+from .db import postgis_query_to_geojson, sql_query_raw, sql_query_to_df
 
-app = FastAPI(docs_url=f"{URL_ROOT}/docs")
+app = FastAPI(docs_url=f"{URL_ROOT}/docs", openapi_url=f"{URL_ROOT}/openapi.json")
 
 app.add_middleware(
     CORSMiddleware,
@@ -13,8 +14,6 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
-
-app.include_router(sidewalk_router)
 
 
 @app.on_event("startup")
@@ -27,8 +26,246 @@ async def shutdown():
     pass
 
 
-@app.get(URL_ROOT)
-async def root():
-    return {
-        "message": "Welcome to the Sidewalk Priorities API. Add /docs to this URL to see all available API routes."
-    }
+@app.get(f"{URL_ROOT}/nearby-gaps/")
+async def get_missing_links_near_poi(q: int) -> dict:
+    """
+    Accept a ID for a point from the ETA dataset
+
+    Return all geometries that intersect the OSM isochrones
+    """
+
+    query = f"""
+        with bounds as (
+            select geom
+            from api.isochrones
+            where eta_uid = '{int(q)}'
+            and src_network = 'osm_edges_all_no_motorway'
+        )
+        select
+            ml.uid,
+            ml.island_count,
+            st_transform(ml.geom, 4326) as geometry
+        from api.missing_links ml, bounds b
+        where st_intersects(ml.geom, b.geom)
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["uid", "island_count", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@app.get(f"{URL_ROOT}/gaps-within-muni/")
+async def get_missing_links_inside_muni(q: str) -> dict:
+    """
+    Get missing gaps within a municipality as geojson
+    """
+
+    if ";" in q:
+        return None
+
+    query = f"""
+        with bounds as (
+            select geom
+            from api.montco_munis
+            where mun_name = '{q}'
+        )
+        select
+            ml.uid,
+            ml.island_count,
+            st_transform(ml.geom, 4326) as geometry
+        from api.missing_links ml, bounds b
+        where st_intersects(ml.geom, b.geom)
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["uid", "island_count", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@app.get(f"{URL_ROOT}/all-munis/")
+async def get_all_munis() -> dict:
+    """
+    Return a geojson with all municipalities in Montgomery County
+    """
+
+    query = """
+        select
+            mun_name,
+            st_transform(geom, 4326) as geometry
+        from
+            api.montco_munis
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["mun_name", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@app.get(f"{URL_ROOT}/one-muni/")
+async def get_one_muni(q: str) -> dict:
+    """
+    Accept a string for municpality name
+
+    Return a geojson with one shape
+    """
+
+    if ";" in q:
+        return JSONResponse(status_code=404, content={"message": "Given geoid not found."})
+
+    query = f"""
+        select
+            mun_name,
+            st_transform(geom, 4326) as geometry
+        from
+            api.montco_munis
+        where
+            mun_name = '{q}'
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["mun_name", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@app.get(f"{URL_ROOT}/one-muni-centroid/")
+async def get_one_muni_centroid(q: str) -> dict:
+    """
+    Accept a string for municpality name
+
+    Return json with X/Y value for the centroid
+    """
+
+    if ";" in q:
+        return None
+
+    query = f"""
+        with point as (
+        select
+                st_centroid(st_transform(geom, 4326)) as geom
+            from
+                api.montco_munis
+            where
+                mun_name = '{q}'
+        )
+        select
+            st_x(geom) as x,
+            st_y(geom) as y
+        from point
+    """
+
+    return await sql_query_raw(query, DATABASE_URL)
+
+
+@app.get(f"{URL_ROOT}/walkshed-area/")
+async def get_walkshed_areas_for_poi(q: int) -> dict:
+    """
+    Accept a ID for a point from the ETA dataset
+
+    Return a json with the area of each polygon walkshed for that point
+    """
+
+    query = f"""
+        select
+            src_network,
+            st_area(geom) * 3.86102e-7 as area_sq_miles
+        from
+            api.isochrones
+        where
+            eta_uid = '{int(q)}'
+    """
+
+    df = await sql_query_to_df(query, ["src_network", "area_sq_miles"], DATABASE_URL)
+
+    # Dump dataframe contents into dictionary
+    output = {}
+    for _, row in df.iterrows():
+        output[row.src_network] = {"area_in_square_miles": row.area_sq_miles}
+
+    # Make sure all responses have two values, even if it's a zero
+    for expected_key in ["pedestriannetwork_lines", "osm_edges_all_no_motorway"]:
+        if expected_key not in output:
+            output[expected_key] = {"area_in_square_miles": [0]}
+
+    return output
+
+
+@app.get(f"{URL_ROOT}/pois-near-gap/")
+async def get_poi_uids_near_gap_segment(q: int) -> dict:
+    """Get a list of unique IDs of POIs that a sidewalk gap would help with"""
+    query = f"""
+    with sw as (
+        select
+            geom
+        from
+            api.missing_links
+        where
+            uid = {int(q)}
+    ),
+    poi_uids as (
+        select distinct i.eta_uid as poi_uid from api.isochrones i, sw
+        where st_within(sw.geom, i.geom)
+        and src_network = 'osm_edges_all_no_motorway'
+    )
+    select
+        array_agg(p.poi_name) as poi_name,
+        p.category,
+        p.ab_ratio,
+        st_transform(p.geom, 4326) as geometry
+    from api.pois p
+    inner join
+        poi_uids u
+      on p.poi_uid::text = u.poi_uid
+    group by p.category, p.geom, p.ab_ratio
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["poi_name", "category", "ab_ratio", "geometry"],
+        DATABASE_URL,
+    )
+
+
+@app.get(f"{URL_ROOT}/pois-near-existing-sidewalk/")
+async def get_poi_uids_near_existing_sidewalk(lng: float, lat: float) -> dict:
+    """Get a geojson of all POIs that have OSM walksheds intersecting a given lng/lat"""
+    query = f"""
+    with sw as (
+        select
+            st_transform(
+                st_setsrid(
+                    st_point({lng}, {lat}),
+                    4326
+                ),
+                26918
+            ) as geom
+    ),
+    poi_uids as (
+        select distinct i.eta_uid as poi_uid from api.isochrones i, sw
+        where st_within(sw.geom, i.geom)
+        and src_network = 'osm_edges_all_no_motorway'
+    )
+    select
+        array_agg(p.poi_name) as poi_name,
+        p.category,
+        p.ab_ratio,
+        st_transform(p.geom, 4326) as geometry
+    from api.pois p
+    inner join
+        poi_uids u
+      on p.poi_uid::text = u.poi_uid
+    group by p.category, p.geom, p.ab_ratio
+    """
+
+    return await postgis_query_to_geojson(
+        query,
+        ["poi_name", "category", "ab_ratio", "geometry"],
+        DATABASE_URL,
+    )
