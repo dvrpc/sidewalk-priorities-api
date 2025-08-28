@@ -1,0 +1,5 @@
+asyncpg==0.30.*
+fastapi[standard]==0.116.*
+geopandas==0.9.*
+python-dotenv==0.19.*
+shapely==1.7.*
